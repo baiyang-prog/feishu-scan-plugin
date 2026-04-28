@@ -1,84 +1,130 @@
-<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-    <meta charset="UTF-8>
-    <title>扫码插件A</title>
-    <style>
-        body { padding: 30px; font-size: 16px; }
-        #status { font-size: 20px; margin: 20px 0; }
-        .success { color: #090; }
-        .error { color: #f00; }
-    </style>
-</head>
-<body>
-    <h1>✅ 扫码录入</h1>
-    <div id="status">初始化...</div>
+import React, { useState, useEffect } from 'react';
+import { bitable, IFieldMeta } from '@lark-base-open/js-sdk';
 
-<script src="https://lf16-cn-toutiaocdn-tos.bytecdns.com/obj/feishuikit/feishuikit-opensdk-v6/feishuikit-opensdk.min.js"></script>
-<script>
-    const config = {
-        appToken: "WJiUwFvh1iarWUkCAMkcWySfn8g",
-        tableId: "tblRe2YOFsaLmJ4J"
+// --- 配置信息 ---
+const CONFIG = {
+  appToken: "WJiUwFvh1iarWUkCAMkcWySfn8g",
+  tableId: "tblRe2YOFsaLmJ4J",
+  // 注意：这里填入的是用户看到的列名（即“条码”），SDK会自动匹配对应的ID
+  barcodeFieldName: "条码" 
+};
+
+const BarcodeScannerPlugin: React.FC = () => {
+  const [inputValue, setInputValue] = useState('');
+  const [status, setStatus] = useState('就绪。请扫描条码...');
+
+  // 1. 初始化连接
+  useEffect(() => {
+    const init = async () => {
+      try {
+        // 连接多维表格（如果插件运行在飞书内，无需传参）
+        await bitable.bridge.connect();
+        setStatus('已连接。扫描枪请对准此处...');
+      } catch (error) {
+        setStatus('连接失败: ' + error.message);
+      }
     };
+    init();
+  }, []);
 
-    window.onload = async function () {
-        try {
-            const h5Sdk = window.H5SDK;
-            const kit = h5Sdk.getKitContext();
-            window.scanKit = kit;
-            setStatus("✅ 等待扫码...");
-            startScan();
-        } catch (e) {
-            setStatus("❌ 初始化失败", "error");
-        }
-    };
+  // 2. 处理扫码输入
+  const handleInputChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const code = e.target.value.trim();
+    // 防止空值提交
+    if (!code) return;
 
-    let code = "";
-    let lastTime = Date.now();
+    try {
+      // 获取当前表格实例
+      const table = bitable.base.getActiveTable();
+      
+      // 构造要写入的数据
+      // 注意：这里的 key 是列名 "条码"，value 是扫码获取的字符串
+      const recordData = {
+        [CONFIG.barcodeFieldName]: code
+      };
 
-    function startScan() {
-        document.addEventListener("keydown", (e) => {
-            e.stopPropagation();
-            const now = Date.now();
-            if (now - lastTime > 50) code = "";
-            lastTime = now;
+      // 调用添加记录接口
+      const result = await table.addRecords({
+        // addRecords 接口支持批量，所以传入一个数组
+        records: [{ fields: recordData }]
+      });
 
-            if (e.key === "Enter") {
-                if (code.length > 2) createRecord(code);
-                code = "";
-                return;
-            }
-            code += e.key;
-        });
+      setStatus(`✅ 成功录入: ${code}`);
+      // 清空输入框，准备下一次扫描
+      setInputValue('');
+      
+    } catch (error: any) {
+      console.error('写入失败:', error);
+      setStatus(`❌ 写入失败: ${error.message}`);
     }
+  };
 
-    async function createRecord(barcode) {
-        setStatus("正在创建：" + barcode);
-        try {
-            const result = await window.scanKit.callNative({
-                method: "bitable.createRecord",
-                params: {
-                    appToken: config.appToken,
-                    tableId: config.tableId,
-                    fields: {
-                        "名称": "扫码录入",
-                        "条码": barcode
-                    }
-                }
-            });
+  return (
+    <div style={styles.container}>
+      <h2>📦 扫码枪录入插件</h2>
+      
+      {/* 
+        核心输入框：设置样式为透明且宽大，覆盖整个屏幕，确保扫码枪能“看到”它。
+        autoFocus 确保插件打开时焦点就在输入框内。
+      */}
+      <input
+        type="text"
+        value={inputValue}
+        onChange={handleInputChange}
+        autoFocus
+        style={styles.input}
+        placeholder="请将光标置于此处或直接扫描..."
+      />
+      
+      {/* 状态显示 */}
+      <div style={styles.status}>
+        {status}
+      </div>
 
-            setStatus("✅ 创建成功：" + barcode, "success");
-        } catch (err) {
-            setStatus("❌ 失败：" + err.message, "error");
-            console.error(err);
-        }
-    }
+      {/* 提示文字 */}
+      <small style={styles.tip}>
+        💡 提示：扫码枪模拟键盘输入。如果扫描太快导致多行录入，请在扫码枪设置中增加“回车延时”。
+      </small>
+    </div>
+  );
+};
 
-    function setStatus(text, cls) {
-        const s = document.getElementById("status");
-        s.textContent = text;
-        s.className = cls || "";
-    }
-</script>
-</body>
-</html>
+// 样式定义
+const styles = {
+  container: {
+    padding: '20px',
+    fontFamily: 'Arial, sans-serif',
+    height: '100vh',
+    display: 'flex',
+    flexDirection: 'column' as const,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#f5f5f5'
+  },
+  input: {
+    position: 'absolute' as const,
+    opacity: 0.01, // 几乎透明，但能获取焦点
+    width: '100%',
+    height: '100%',
+    top: 0,
+    left: 0,
+    zIndex: 1,
+    fontSize: '20px' // 防止某些扫码枪因输入框太小而报错
+  },
+  status: {
+    marginTop: '20px',
+    padding: '10px 20px',
+    backgroundColor: 'white',
+    border: '1px solid #ddd',
+    borderRadius: '4px',
+    textAlign: 'center' as const,
+    fontWeight: 'bold'
+  },
+  tip: {
+    marginTop: '20px',
+    color: '#666',
+    textAlign: 'center' as const
+  }
+};
+
+export default BarcodeScannerPlugin;
