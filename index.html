@@ -2,67 +2,51 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <title>扫码测试</title>
+    <title>扫码插件</title>
     <style>
-        body { padding: 30px; font-size: 16px; font-family: Arial,"Microsoft YaHei"; }
+        body { padding: 30px; font-size: 16px; font-family: Microsoft YaHei; }
         #status { font-size: 20px; margin: 20px 0; }
         .success { color: #00b42a; }
         .error { color: #ff4d4f; }
     </style>
 </head>
 <body>
-    <h1>✅ 扫码录入（已修复SDK）</h1>
-    <div id="status">初始化中...</div>
+    <h1>✅ 扫码录入</h1>
+    <div id="status">页面加载中...</div>
     <div id="log"></div>
+
+<!-- 飞书官方 SDK 必须放在这里 -->
+<script src="https://lf16-cn-toutiaocdn-tos.bytecdns.com/obj/feishuikit/feishuikit-opensdk-v6/feishuikit-opensdk.min.js"></script>
 
 <script>
     // ==========================
-    // 你的配置（不用改）
+    // 你的配置
     // ==========================
     const config = {
         appToken: "WJiUwFvh1iarWUkCAMkcWySfn8g",
         tableId: "tblRe2YOFsaLmJ4J"
     };
 
-    let ttkit = null;
-
-    // ==========================
-    // 加载飞书 SDK
-    // ==========================
-    function loadSDK() {
-        return new Promise((resolve, reject) => {
-            const script = document.createElement('script');
-            script.src = "https://lf16-cn-toutiaocdn-tos.bytecdns.com/obj/feishuikit/feishuikit-opensdk-v6/feishuikit-opensdk.min.js";
-            script.onload = resolve;
-            script.onerror = reject;
-            document.body.appendChild(script);
-        });
-    }
-
-    // ==========================
-    // 初始化
-    // ==========================
-    async function init() {
+    // 等待 SDK 就绪
+    window.onload = async function () {
         try {
-            await loadSDK();
-            ttkit = window.ttkit;
-            setStatus("✅ 初始化完成，等待扫码...");
-            startScanListener();
-        } catch (err) {
-            setStatus("❌ SDK 加载失败", "error");
+            const ttkit = window.ttkit;
+            setStatus("✅ 就绪，等待扫码...");
+            startScan(ttkit);
+        } catch (e) {
+            setStatus("❌ 初始化失败", "error");
         }
-    }
+    };
 
     // ==========================
     // 扫码监听
     // ==========================
-    function startScanListener() {
+    function startScan(ttkit) {
         let inputStr = "";
         let lastTime = Date.now();
 
         document.addEventListener("keydown", (e) => {
-            e.stopPropagation();
-            e.preventDefault();
+            e.stopPropagation(); // 关键：不让飞书捕获
 
             const now = Date.now();
             if (now - lastTime > 50) inputStr = "";
@@ -70,23 +54,22 @@
 
             if (e.key === "Enter") {
                 if (inputStr.length > 2) {
-                    onScan(inputStr);
+                    onScan(ttkit, inputStr);
                 }
                 inputStr = "";
                 return;
             }
-
             inputStr += e.key;
         });
     }
 
     // ==========================
-    // 扫码 → 创建记录
+    // 执行扫码 → 创建记录
     // ==========================
-    async function onScan(barcode) {
-        setStatus("正在创建记录：" + barcode);
+    async function onScan(ttkit, barcode) {
+        setStatus("正在创建：" + barcode);
         try {
-            const resp = await ttkit.request({
+            const res = await ttkit.request({
                 method: "POST",
                 url: `/open-apis/bitable/v1/apps/${config.appToken}/tables/${config.tableId}/records`,
                 data: {
@@ -98,30 +81,17 @@
             });
 
             setStatus("✅ 创建成功：" + barcode, "success");
-            addLog("记录已添加");
         } catch (err) {
-            setStatus("❌ 创建失败", "error");
-            addLog("错误：" + err.message);
+            setStatus("❌ 失败：" + err.message, "error");
             console.error(err);
         }
     }
 
-    // ==========================
-    // 工具
-    // ==========================
     function setStatus(text, cls) {
         const el = document.getElementById("status");
         el.textContent = text;
         el.className = cls || "";
     }
-
-    function addLog(text) {
-        const log = document.getElementById("log");
-        log.innerHTML += "<div>" + text + "</div>";
-    }
-
-    // 启动
-    init();
 </script>
 </body>
 </html>
