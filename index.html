@@ -1,78 +1,65 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-    <meta charset="UTF-8">
-    <title>扫码插件</title>
+    <meta charset="UTF-8>
+    <title>扫码插件A</title>
     <style>
-        body { padding: 30px; font-size: 16px; font-family: Microsoft YaHei; }
+        body { padding: 30px; font-size: 16px; }
         #status { font-size: 20px; margin: 20px 0; }
-        .success { color: #00b42a; }
-        .error { color: #ff4d4f; }
+        .success { color: #090; }
+        .error { color: #f00; }
     </style>
 </head>
 <body>
     <h1>✅ 扫码录入</h1>
-    <div id="status">页面加载中...</div>
-    <div id="log"></div>
+    <div id="status">初始化...</div>
 
-<!-- 飞书官方 SDK 必须放在这里 -->
 <script src="https://lf16-cn-toutiaocdn-tos.bytecdns.com/obj/feishuikit/feishuikit-opensdk-v6/feishuikit-opensdk.min.js"></script>
-
 <script>
-    // ==========================
-    // 你的配置
-    // ==========================
     const config = {
         appToken: "WJiUwFvh1iarWUkCAMkcWySfn8g",
         tableId: "tblRe2YOFsaLmJ4J"
     };
 
-    // 等待 SDK 就绪
     window.onload = async function () {
         try {
-            const ttkit = window.ttkit;
-            setStatus("✅ 就绪，等待扫码...");
-            startScan(ttkit);
+            const h5Sdk = window.H5SDK;
+            const kit = h5Sdk.getKitContext();
+            window.scanKit = kit;
+            setStatus("✅ 等待扫码...");
+            startScan();
         } catch (e) {
             setStatus("❌ 初始化失败", "error");
         }
     };
 
-    // ==========================
-    // 扫码监听
-    // ==========================
-    function startScan(ttkit) {
-        let inputStr = "";
-        let lastTime = Date.now();
+    let code = "";
+    let lastTime = Date.now();
 
+    function startScan() {
         document.addEventListener("keydown", (e) => {
-            e.stopPropagation(); // 关键：不让飞书捕获
-
+            e.stopPropagation();
             const now = Date.now();
-            if (now - lastTime > 50) inputStr = "";
+            if (now - lastTime > 50) code = "";
             lastTime = now;
 
             if (e.key === "Enter") {
-                if (inputStr.length > 2) {
-                    onScan(ttkit, inputStr);
-                }
-                inputStr = "";
+                if (code.length > 2) createRecord(code);
+                code = "";
                 return;
             }
-            inputStr += e.key;
+            code += e.key;
         });
     }
 
-    // ==========================
-    // 执行扫码 → 创建记录
-    // ==========================
-    async function onScan(ttkit, barcode) {
+    async function createRecord(barcode) {
         setStatus("正在创建：" + barcode);
         try {
-            const res = await ttkit.request({
-                method: "POST",
-                url: `/open-apis/bitable/v1/apps/${config.appToken}/tables/${config.tableId}/records`,
-                data: {
+            const result = await window.scanKit.callNative({
+                method: "bitable.createRecord",
+                params: {
+                    appToken: config.appToken,
+                    tableId: config.tableId,
                     fields: {
                         "名称": "扫码录入",
                         "条码": barcode
@@ -88,9 +75,9 @@
     }
 
     function setStatus(text, cls) {
-        const el = document.getElementById("status");
-        el.textContent = text;
-        el.className = cls || "";
+        const s = document.getElementById("status");
+        s.textContent = text;
+        s.className = cls || "";
     }
 </script>
 </body>
