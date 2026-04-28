@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>扫码测试插件</title>
+    <style>
+        body { padding: 30px; font-size: 16px; }
+        #status { font-size: 20px; margin: 20px 0; }
+        .success { color: #00b42a; }
+        .error { color: #ff4d4f; }
+    </style>
+</head>
+<body>
+    <h1>✅ 扫码测试（仅新增记录）</h1>
+    <div id="status">等待扫码...</div>
+    <div id="log"></div>
+
+    <!-- 飞书官方 SDK -->
+    <script src="https://lf16-cn-toutiaocdn-tos.bytecdns.com/obj/feishuikit/feishuikit-opensdk-v6/feishuikit-opensdk.min.js"></script>
+
+    <script>
+        // ==========================================
+        // 你只需要填 2 个东西：appToken 和 tableID
+        // ==========================================
+        const config = {
+             appToken: "WJiUwFvh1iarWUkCAMkcWySfn8g",
+             tableId: "tblRe2YOFsaLmJ4J"
+        };
+
+        // ======================
+        // 扫码枪监听（核心）
+        // ======================
+        let inputStr = "";
+        let lastTime = Date.now();
+
+        document.addEventListener("keydown", (e) => {
+            const now = Date.now();
+            if (now - lastTime > 50) inputStr = ""; // 间隔大 = 重新开始
+            lastTime = now;
+
+            // 扫码枪结束会自动敲回车
+            if (e.key === "Enter") {
+                if (inputStr.length > 2) onScanSuccess(inputStr);
+                inputStr = "";
+                return;
+            }
+            inputStr += e.key;
+        });
+
+        // ======================
+        // 扫码成功 → 新增记录
+        // ======================
+        async function onScanSuccess(barcode) {
+            setStatus("扫码成功：" + barcode);
+            addLog("正在创建记录...");
+
+            try {
+                const ttkit = window.ttkit;
+
+                // 飞书 API：创建一条记录
+                const result = await ttkit.request({
+                    method: "POST",
+                    url: `/open-apis/bitable/v1/apps/${config.appToken}/tables/${config.tableId}/records`,
+                    data: {
+                        fields: {
+                            "名称": "扫码录入",
+                            "条码": barcode
+                        }
+                    }
+                });
+
+                setStatus("✅ 创建记录成功！", "success");
+                addLog("返回结果：" + JSON.stringify(result));
+
+            } catch (err) {
+                setStatus("❌ 创建失败", "error");
+                addLog("错误：" + err.message);
+                console.error(err);
+            }
+        }
+
+        // 工具函数
+        function setStatus(text, cls) {
+            const s = document.getElementById("status");
+            s.textContent = text;
+            s.className = cls || "";
+        }
+
+        function addLog(text) {
+            const log = document.getElementById("log");
+            log.innerHTML += "<div>" + text + "</div>";
+        }
+    </script>
+</body>
