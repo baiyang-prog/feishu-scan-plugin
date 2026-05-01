@@ -1,130 +1,233 @@
-import React, { useState, useEffect } from 'react';
-import { bitable, IFieldMeta } from '@lark-base-open/js-sdk';
-
-// --- 配置信息 ---
-const CONFIG = {
-  appToken: "WJiUwFvh1iarWUkCAMkcWySfn8g",
-  tableId: "tblRe2YOFsaLmJ4J",
-  // 注意：这里填入的是用户看到的列名（即“条码”），SDK会自动匹配对应的ID
-  barcodeFieldName: "条码" 
-};
-
-const BarcodeScannerPlugin: React.FC = () => {
-  const [inputValue, setInputValue] = useState('');
-  const [status, setStatus] = useState('就绪。请扫描条码...');
-
-  // 1. 初始化连接
-  useEffect(() => {
-    const init = async () => {
-      try {
-        // 连接多维表格（如果插件运行在飞书内，无需传参）
-        await bitable.bridge.connect();
-        setStatus('已连接。扫描枪请对准此处...');
-      } catch (error) {
-        setStatus('连接失败: ' + error.message);
-      }
-    };
-    init();
-  }, []);
-
-  // 2. 处理扫码输入
-  const handleInputChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const code = e.target.value.trim();
-    // 防止空值提交
-    if (!code) return;
-
-    try {
-      // 获取当前表格实例
-      const table = bitable.base.getActiveTable();
-      
-      // 构造要写入的数据
-      // 注意：这里的 key 是列名 "条码"，value 是扫码获取的字符串
-      const recordData = {
-        [CONFIG.barcodeFieldName]: code
-      };
-
-      // 调用添加记录接口
-      const result = await table.addRecords({
-        // addRecords 接口支持批量，所以传入一个数组
-        records: [{ fields: recordData }]
-      });
-
-      setStatus(`✅ 成功录入: ${code}`);
-      // 清空输入框，准备下一次扫描
-      setInputValue('');
-      
-    } catch (error: any) {
-      console.error('写入失败:', error);
-      setStatus(`❌ 写入失败: ${error.message}`);
-    }
-  };
-
-  return (
-    <div style={styles.container}>
-      <h2>📦 扫码枪录入插件</h2>
-      
-      {/* 
-        核心输入框：设置样式为透明且宽大，覆盖整个屏幕，确保扫码枪能“看到”它。
-        autoFocus 确保插件打开时焦点就在输入框内。
-      */}
-      <input
-        type="text"
-        value={inputValue}
-        onChange={handleInputChange}
-        autoFocus
-        style={styles.input}
-        placeholder="请将光标置于此处或直接扫描..."
-      />
-      
-      {/* 状态显示 */}
-      <div style={styles.status}>
-        {status}
-      </div>
-
-      {/* 提示文字 */}
-      <small style={styles.tip}>
-        💡 提示：扫码枪模拟键盘输入。如果扫描太快导致多行录入，请在扫码枪设置中增加“回车延时”。
-      </small>
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>飞书表格文本插入工具</title>
+    <script src="https://lf1-cdn-tos.bytegoofy.com/goofy/lark-base-js-sdk/base_sdk.js"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f7fa;
+            color: #333;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        .header {
+            background: #3370ff;
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+        .content {
+            padding: 30px;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: bold;
+            color: #555;
+        }
+        input, textarea {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        button {
+            background: #3370ff;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover {
+            background: #2a5de0;
+        }
+        .status {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 4px;
+            display: none;
+        }
+        .success {
+            background: #e6f7ee;
+            color: #0a6640;
+            border: 1px solid #b5f0cb;
+        }
+        .error {
+            background: #fff2f0;
+            color: #d93026;
+            border: 1px solid #ffccc7;
+        }
+        .info {
+            background: #e6f7ff;
+            color: #177ddc;
+            border: 1px solid #91d5ff;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>飞书表格文本插入工具</h1>
+            <p>基于Base SDK的自定义插件</p>
+        </div>
+        <div class="content">
+            <div class="form-group">
+                <label for="tableName">表格名称:</label>
+                <input type="text" id="tableName" placeholder="请输入表格名称" value="默认表格">
+            </div>
+            <div class="form-group">
+                <label for="testText">测试文本:</label>
+                <textarea id="testText" rows="4" placeholder="请输入要插入的测试文本">这是测试文本
+多行内容示例
+时间戳: {timestamp}</textarea>
+            </div>
+            <button id="insertBtn">插入文本到表格</button>
+            
+            <div id="statusMessage" class="status"></div>
+        </div>
     </div>
-  );
-};
 
-// 样式定义
-const styles = {
-  container: {
-    padding: '20px',
-    fontFamily: 'Arial, sans-serif',
-    height: '100vh',
-    display: 'flex',
-    flexDirection: 'column' as const,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#f5f5f5'
-  },
-  input: {
-    position: 'absolute' as const,
-    opacity: 0.01, // 几乎透明，但能获取焦点
-    width: '100%',
-    height: '100%',
-    top: 0,
-    left: 0,
-    zIndex: 1,
-    fontSize: '20px' // 防止某些扫码枪因输入框太小而报错
-  },
-  status: {
-    marginTop: '20px',
-    padding: '10px 20px',
-    backgroundColor: 'white',
-    border: '1px solid #ddd',
-    borderRadius: '4px',
-    textAlign: 'center' as const,
-    fontWeight: 'bold'
-  },
-  tip: {
-    marginTop: '20px',
-    color: '#666',
-    textAlign: 'center' as const
-  }
-};
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // 初始化Base SDK
+            let baseSDK;
+            
+            // 页面加载完成后初始化
+            if (window.BaseSDK) {
+                initBaseSDK();
+            } else {
+                // 如果SDK未加载，等待其加载完成
+                window.addEventListener('BaseSDKReady', initBaseSDK);
+            }
+            
+            function initBaseSDK() {
+                try {
+                    baseSDK = new window.BaseSDK({
+                        // 这里可以配置SDK选项
+                    });
+                    
+                    showStatus('Base SDK已就绪，可以操作表格数据', 'info');
+                } catch (error) {
+                    console.error('Base SDK初始化失败:', error);
+                    showStatus('Base SDK初始化失败，请检查网络连接', 'error');
+                }
+            }
+            
+            // 插入按钮点击事件
+            document.getElementById('insertBtn').addEventListener('click', async function() {
+                const tableName = document.getElementById('tableName').value.trim();
+                const testText = document.getElementById('testText').value.replace('{timestamp}', new Date().toLocaleString());
+                
+                if (!tableName || !testText) {
+                    showStatus('请填写完整的表格名称和测试文本', 'error');
+                    return;
+                }
+                
+                await insertTextToTable(tableName, testText);
+            });
+            
+            // 插入文本到表格的主要函数
+            async function insertTextToTable(tableName, text) {
+                showStatus('正在连接表格...', 'info');
+                
+                try {
+                    // 获取当前应用的数据库信息
+                    const apps = await baseSDK.applink.getAppList();
+                    showStatus(`找到 ${apps.data.length} 个应用`, 'info');
+                    
+                    // 假设我们使用第一个应用（实际使用中需要根据具体应用选择）
+                    if (apps.data.length > 0) {
+                        const appInfo = apps.data[0];
+                        showStatus(`使用应用: ${appInfo.appName}`, 'info');
+                        
+                        // 获取该应用下的所有表格
+                        const tables = await baseSDK.table.list({
+                            appToken: appInfo.appToken
+                        });
+                        
+                        showStatus(`找到 ${tables.data.tables.length} 个表格`, 'info');
+                        
+                        // 查找匹配的表格
+                        let targetTable = null;
+                        for (const table of tables.data.tables) {
+                            if (table.name === tableName || table.name.includes(tableName)) {
+                                targetTable = table;
+                                break;
+                            }
+                        }
+                        
+                        if (!targetTable) {
+                            // 如果没找到指定名称的表格，使用第一个表格作为默认
+                            targetTable = tables.data.tables[0];
+                            showStatus(`未找到名为 "${tableName}" 的表格，使用默认表格: ${targetTable.name}`, 'info');
+                        } else {
+                            showStatus(`找到目标表格: ${targetTable.name}`, 'info');
+                        }
+                        
+                        // 准备插入的数据
+                        const recordData = {
+                            fields: {
+                                '文本字段': text,
+                                '时间戳': new Date().toISOString()
+                            }
+                        };
+                        
+                        // 插入记录到表格
+                        const result = await baseSDK.record.create({
+                            appToken: appInfo.appToken,
+                            tableId: targetTable.tableId,
+                            record: recordData
+                        });
+                        
+                        showStatus(`成功插入记录到表格 "${targetTable.name}"，记录ID: ${result.data.record.recordId}`, 'success');
+                    } else {
+                        throw new Error('未找到可用的应用');
+                    }
+                } catch (error) {
+                    console.error('操作失败:', error);
+                    showStatus(`操作失败: ${error.message}`, 'error');
+                }
+            }
+            
+            // 显示状态消息
+            function showStatus(message, type) {
+                const statusEl = document.getElementById('statusMessage');
+                statusEl.textContent = message;
+                statusEl.className = `status ${type}`;
+                statusEl.style.display = 'block';
+                
+                // 3秒后自动隐藏
+                setTimeout(() => {
+                    statusEl.style.display = 'none';
+                }, 3000);
+            }
+            
+            // 添加一些模拟功能以防SDK未正确加载
+            window.insertTextToTable = function(tableName, text) {
+                console.log('模拟插入操作:', { tableName, text });
+                alert(`模拟插入: 表格="${tableName}", 文本="${text}"`);
+            };
+        });
+    </script>
+</body>
+</html>
 
-export default BarcodeScannerPlugin;
+
+
