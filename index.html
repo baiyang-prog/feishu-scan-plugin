@@ -71,29 +71,36 @@
         const result = document.getElementById("result");
 
         async function fetchData() {
-            // 按钮禁用 + 显示加载中
             btn.disabled = true;
             btn.textContent = "正在处理，请稍候...";
             result.textContent = "请求中...";
 
             try {
-                const response = await fetch(API_URL);
-                const data = await response.json();
+                // ✅ 标准 Bearer 认证格式，已填好你的 Token
+                const response = await fetch(API_URL, {
+                    headers: {
+                        "Authorization": "Bearer tokenData-7443ajbacgb1fff852976d6i1a5551"
+                    }
+                });
 
-                // 显示返回结果
-                result.textContent = JSON.stringify(data, null, 2);
+                let data;
+                try {
+                    data = await response.json();
+                } catch (e) {
+                    data = await response.text();
+                }
 
-                // 根据状态码提示
-                if (response.status === 200) {
+                result.textContent = JSON.stringify(data, null, 2) || data;
+
+                if (response.ok) {
                     result.textContent = "✅ 请求成功\n\n" + result.textContent;
                 } else {
-                    result.textContent = "⚠️ 请求异常，状态码：" + response.status + "\n\n" + result.textContent;
+                    result.textContent = "❌ 认证失败或错误，状态码：" + response.status + "\n\n" + result.textContent;
                 }
 
             } catch (err) {
                 result.textContent = "❌ 请求失败：\n" + err.message;
             } finally {
-                // 恢复按钮
                 btn.disabled = false;
                 btn.textContent = "点击开始处理";
             }
