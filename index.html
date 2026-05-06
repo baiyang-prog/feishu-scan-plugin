@@ -76,10 +76,10 @@
             result.textContent = "请求中...";
 
             try {
-                // ✅ 标准 Bearer 认证格式，已填好你的 Token
+                // ✅ 严格按阿里云 Bearer 认证格式
                 const response = await fetch(API_URL, {
                     headers: {
-                        "Authorization": "Bearer tokenData-7443ajbacgb1fff852976d6i1a5551"
+                        "Authorization": "Bearer tokenData-7443ajbacgb1ff852976d6i1a551"
                     }
                 });
 
@@ -95,7 +95,7 @@
                 if (response.ok) {
                     result.textContent = "✅ 请求成功\n\n" + result.textContent;
                 } else {
-                    result.textContent = "❌ 认证失败或错误，状态码：" + response.status + "\n\n" + result.textContent;
+                    result.textContent = "❌ 认证失败，状态码：" + response.status + "\n\n" + result.textContent;
                 }
 
             } catch (err) {
