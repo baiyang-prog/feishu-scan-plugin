@@ -78,10 +78,9 @@
             result.textContent = "请求中...";
 
             try {
-                // ✅ 严格按阿里云 Bearer 认证格式
                 const response = await fetch(API_URL, {
                     headers: {
-                        "Authorization": "Bearer tokenData-7443ajbacgb1ff852976d6i1a551"
+                        "X-Feishu-Token": "feishu-bind-2026-private-token"
                     }
                 });
 
